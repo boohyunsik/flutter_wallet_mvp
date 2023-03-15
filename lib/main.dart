@@ -1,10 +1,12 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_wallet_mvp/config/config.dart';
 import 'package:flutter_wallet_mvp/handler/aptosHandler.dart';
 import 'package:flutter_wallet_mvp/handler/cosmosHandler.dart';
 import 'package:flutter_wallet_mvp/handler/junoHandler.dart';
 import 'package:flutter_wallet_mvp/handler/osmosisHandler.dart';
+import 'package:flutter_wallet_mvp/ui/walletPage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web3auth_flutter/enums.dart';
 import 'package:web3auth_flutter/input.dart';
@@ -49,14 +51,7 @@ class _MyHomePageState extends State<MyHomePage> {
   String _privKey = '';
   bool logoutVisible = false;
 
-  Map<String, Handler> handlers = {
-    "ETH": const EthereumHandler(rpc: "https://goerli.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161"),
-    "APTOS": AptosHandler(),
-    "COSMOS": const CosmosHandler(rpc: "https://cosmos-testnet-rpc.allthatnode.com:26657"),
-    "OSMOSIS": OsmosisHandler(),
-    "JUNO": JunoHandler(),
-    "POLYGON": const PolygonHandler(rpc: "https://rpc-mumbai.maticvigil.com/"),
-  };
+  Map<String, Handler> handlers = {};
 
   @override
   void initState() {
@@ -89,11 +84,19 @@ class _MyHomePageState extends State<MyHomePage> {
       try {
         final Web3AuthResponse response = await method();
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('privateKey', response.privKey.toString());
+        await prefs.setString(Constants.privateKey, response.privKey.toString());
         setState(() {
           _result = response.toString();
           _privKey = response.privKey.toString();
           logoutVisible = true;
+          handlers = {
+            Constants.eth: const EthereumHandler(rpc: Config.ethereumTestnetRpc),
+            Constants.aptos: AptosHandler(),
+            Constants.cosmos: CosmosHandler(rpc: Config.cosmosTestnetRpc, privateKey: response.privKey.toString()),
+            Constants.osmosis: OsmosisHandler(rpc: Config.osmosisTestnetRpc, privateKey: response.privKey.toString()),
+            Constants.juno: JunoHandler(rpc: Config.junoTestnetRpc, privateKey: response.privKey.toString()),
+            Constants.polygon: const PolygonHandler(rpc: Config.polygonTestnetRpc),
+          };
         });
       } on UserCancelledException {
         print("User cancelled.");
@@ -142,6 +145,16 @@ class _MyHomePageState extends State<MyHomePage> {
     return b.toString();
   }
 
+  void onWalletClicked(BuildContext context, String chain) {
+    if (!handlers.containsKey(chain) || handlers[chain] == null) {
+      return;
+    }
+
+    Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => WalletPage(handler: handlers[chain]!)));
+  }
+
   @override
   Widget build(BuildContext context) {
     // This method is rerun every time setState is called, for instance as done
@@ -184,6 +197,12 @@ class _MyHomePageState extends State<MyHomePage> {
             // ),
             Column(
               children: [
+                ElevatedButton(onPressed: () => onWalletClicked(context, 'ETH'), child: const Text('Ethereum')),
+                ElevatedButton(onPressed: () => onWalletClicked(context, 'POLYGON'), child: const Text('Polygon')),
+                ElevatedButton(onPressed: () => onWalletClicked(context, 'APTOS'), child: const Text('Aptos')),
+                ElevatedButton(onPressed: () => onWalletClicked(context, 'COSMOS'), child: const Text('Cosmos Hub')),
+                ElevatedButton(onPressed: () => onWalletClicked(context, 'OSMOSIS'), child: const Text('Osmosis')),
+                ElevatedButton(onPressed: () => onWalletClicked(context, 'JUNO'), child: const Text('Juno')),
                 Text("PrivKey: $_privKey"),
                 Text("ETH: ${getAddr("ETH", _privKey)}"),
                 FutureBuilder(builder: (context, snapshot) {
